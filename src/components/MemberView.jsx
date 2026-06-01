@@ -16,7 +16,7 @@ export default function MemberView({ userId, initialRoomCode, onBack }) {
   const [err, setErr] = useState('')
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(!!initialRoomCode)
-  const [userName] = useState(() => {
+  const [userName, setUserName] = useState(() => {
     let n = sessionStorage.getItem('sympo_name')
     if (!n) { n = getRandomName(); sessionStorage.setItem('sympo_name', n) }
     return n
@@ -40,6 +40,14 @@ export default function MemberView({ userId, initialRoomCode, onBack }) {
     } finally {
       setLoading(false)
     }
+  }
+
+  function joinRoom() {
+    const name = userName.trim()
+    if (name.length < 1) { setErr('請先輸入你的名稱'); return }
+    sessionStorage.setItem('sympo_name', name)
+    setUserName(name)
+    loadRoom(inputCode.trim().toUpperCase())
   }
 
   useEffect(() => { if (initialRoomCode) loadRoom(initialRoomCode) }, [initialRoomCode])
@@ -100,13 +108,23 @@ export default function MemberView({ userId, initialRoomCode, onBack }) {
       <div className="w-full max-w-sm space-y-4">
         <button onClick={onBack} className="text-slate-400 hover:text-white text-sm">← 返回</button>
         <h1 className="text-2xl font-bold text-white">加入共讀房間</h1>
-        <input type="text" maxLength={6} value={inputCode}
-          onChange={e => { setInputCode(e.target.value.toUpperCase()); setErr('') }}
-          onKeyDown={e => e.key === 'Enter' && loadRoom(inputCode.trim().toUpperCase())}
-          placeholder="輸入 6 位房間碼"
-          className="w-full bg-slate-800 text-white placeholder-slate-500 rounded-lg px-4 py-3 text-center text-2xl tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-violet-500" />
+        <div className="space-y-1">
+          <label className="text-slate-400 text-sm">你的名稱</label>
+          <input type="text" maxLength={20} value={userName}
+            onChange={e => { setUserName(e.target.value); setErr('') }}
+            placeholder="輸入你的名稱，方便主持人辨識"
+            className="w-full bg-slate-800 text-white placeholder-slate-500 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-violet-500" />
+        </div>
+        <div className="space-y-1">
+          <label className="text-slate-400 text-sm">房間碼</label>
+          <input type="text" maxLength={6} value={inputCode}
+            onChange={e => { setInputCode(e.target.value.toUpperCase()); setErr('') }}
+            onKeyDown={e => e.key === 'Enter' && joinRoom()}
+            placeholder="輸入 6 位房間碼"
+            className="w-full bg-slate-800 text-white placeholder-slate-500 rounded-lg px-4 py-3 text-center text-2xl tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-violet-500" />
+        </div>
         {err && <p className="text-red-400 text-sm">{err}</p>}
-        <button onClick={() => loadRoom(inputCode.trim().toUpperCase())}
+        <button onClick={joinRoom}
           className="w-full py-3 bg-teal-600 hover:bg-teal-500 text-white font-semibold rounded-xl transition-colors">
           進入房間
         </button>
