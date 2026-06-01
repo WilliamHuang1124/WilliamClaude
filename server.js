@@ -117,9 +117,10 @@ app.post('/api/generate', async (req, res) => {
 文章內容：
 ${content.slice(0, 3000)}`
 
+  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash'
   try {
     const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -129,7 +130,10 @@ ${content.slice(0, 3000)}`
         }),
       }
     )
-    if (!r.ok) throw new Error(`Gemini API ${r.status}`)
+    if (!r.ok) {
+      const detail = await r.text().catch(() => '')
+      throw new Error(`Gemini API ${r.status} (model=${model})${detail ? ': ' + detail.slice(0, 200) : ''}`)
+    }
     const data = await r.json()
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
     const questions = JSON.parse(text)
