@@ -104,39 +104,42 @@ app.patch('/api/answer/:id/publish', (req, res) => {
 app.post('/api/generate', async (req, res) => {
   const { content } = req.body
   if (!content) return res.status(400).json({ error: '缺少文章內容' })
-  const key = process.env.GEMINI_API_KEY
-  if (!key) return res.status(500).json({ error: '伺服器未設定 GEMINI_API_KEY' })
+  const key = process.env.GROQ_API_KEY
+  if (!key) return res.status(500).json({ error: '伺服器未設定 GROQ_API_KEY' })
 
   const prompt = `你是一位優秀的讀書會引導師。請根據以下文章內容，設計 2 道能激發深度討論的開放性思辨問題。
 要求：
 1. 問題應能引導讀者反思、辯論或從不同角度思考
 2. 避免是非題，鼓勵多元觀點
 3. 以繁體中文回答
-4. 直接回傳 JSON 陣列格式，如：["問題1", "問題2"]
+4. 只回傳 JSON 物件，格式為：{"questions": ["問題1", "問題2"]}
 
 文章內容：
 ${content.slice(0, 3000)}`
 
-  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash'
+  const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
   try {
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: 'application/json' },
-        }),
-      }
-    )
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
+        temperature: 0.7,
+      }),
+    })
     if (!r.ok) {
       const detail = await r.text().catch(() => '')
-      throw new Error(`Gemini API ${r.status} (model=${model})${detail ? ': ' + detail.slice(0, 200) : ''}`)
+      throw new Error(`Groq API ${r.status} (model=${model})${detail ? ': ' + detail.slice(0, 200) : ''}`)
     }
     const data = await r.json()
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
-    const questions = JSON.parse(text)
+    const text = data?.choices?.[0]?.message?.content || ''
+    const parsed = JSON.parse(text)
+    const questions = Array.isArray(parsed) ? parsed : parsed.questions
     if (!Array.isArray(questions) || questions.length < 2) throw new Error('格式異常')
     res.json({ questions: questions.slice(0, 2) })
   } catch (e) {

@@ -10,7 +10,7 @@ npm install
 
 # 2. 設定環境變數
 cp .env.example .env
-# 編輯 .env，填入 GEMINI_API_KEY
+# 編輯 .env，填入 GROQ_API_KEY（到 https://console.groq.com 申請，gsk_ 開頭）
 
 # 3. 開發模式（前後端同時）
 npm run dev
@@ -26,11 +26,11 @@ node server.js
 # 上傳程式碼後
 npm install --production
 npm run build
-GEMINI_API_KEY=AIza... PORT=3000 node server.js
+GROQ_API_KEY=gsk_... PORT=3000 node server.js
 
 # 建議搭配 PM2 保持背景執行
 npm install -g pm2
-GEMINI_API_KEY=AIza... pm2 start server.js --name symporead
+GROQ_API_KEY=gsk_... pm2 start server.js --name symporead
 ```
 
 ## 架構說明

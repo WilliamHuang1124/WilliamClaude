@@ -6,7 +6,7 @@ services:
     buildCommand: npm install && npm run build
     startCommand: node server.js
     envVars:
-      - key: GEMINI_API_KEY
+      - key: GROQ_API_KEY
         sync: false
       - key: PORT
         value: 3000
