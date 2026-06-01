@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: symporead
+    runtime: node
+    region: singapore
+    buildCommand: npm install && npm run build
+    startCommand: node server.js
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PORT
+        value: 3000
