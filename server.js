@@ -4,6 +4,7 @@ import { WebSocketServer } from 'ws'
 import cors from 'cors'
 import { fileURLToPath } from 'url'
 import { join, dirname } from 'path'
+import { Redis } from '@upstash/redis'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -13,8 +14,61 @@ const wss = new WebSocketServer({ server, path: '/ws' })
 app.use(cors())
 app.use(express.json())
 
-const rooms = new Map()
-const answers = new Map()
+// Redis 連線（設定環境變數後自動啟用，否則退回記憶體模式）
+const redis = (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
+  ? new Redis({ url: process.env.UPSTASH_REDIS_REST_URL, token: process.env.UPSTASH_REDIS_REST_TOKEN })
+  : null
+
+const memRooms = new Map()
+const memAnswers = new Map()
+
+const ROOM_TTL = 60 * 60 * 24 * 3 // 3 天自動過期
+
+async function getRoom(code) {
+  if (redis) return redis.get(`room:${code}`)
+  return memRooms.get(code) ?? null
+}
+
+async function setRoom(code, room) {
+  if (redis) return redis.set(`room:${code}`, room, { ex: ROOM_TTL })
+  memRooms.set(code, room)
+}
+
+async function roomExists(code) {
+  if (redis) return !!(await redis.exists(`room:${code}`))
+  return memRooms.has(code)
+}
+
+async function saveAnswer(answer) {
+  if (redis) {
+    await redis.set(`answer:${answer.id}`, answer, { ex: ROOM_TTL })
+    await redis.lpush(`answers:${answer.roomCode}`, answer.id)
+    await redis.expire(`answers:${answer.roomCode}`, ROOM_TTL)
+  } else {
+    memAnswers.set(answer.id, answer)
+  }
+}
+
+async function updateAnswer(answer) {
+  if (redis) return redis.set(`answer:${answer.id}`, answer, { ex: ROOM_TTL })
+  memAnswers.set(answer.id, answer)
+}
+
+async function getAnswer(id) {
+  if (redis) return redis.get(`answer:${id}`)
+  return memAnswers.get(id) ?? null
+}
+
+async function getRoomAnswers(code) {
+  if (redis) {
+    const ids = await redis.lrange(`answers:${code}`, 0, -1)
+    if (!ids.length) return []
+    const items = await Promise.all(ids.map(id => redis.get(`answer:${id}`)))
+    return items.filter(Boolean)
+  }
+  return [...memAnswers.values()].filter(a => a.roomCode === code)
+}
+
 const roomSubscriptions = new Map() // roomCode -> Set<ws>
 
 function genCode() {
@@ -55,48 +109,50 @@ wss.on('connection', (ws) => {
   })
 })
 
-app.get('/api/room/:code', (req, res) => {
+app.get('/api/room/:code', async (req, res) => {
   const code = req.params.code.toUpperCase()
-  const room = rooms.get(code)
+  const room = await getRoom(code)
   if (!room) return res.status(404).json({ error: '找不到房間' })
   res.json(room)
 })
 
-app.post('/api/room', (req, res) => {
+app.post('/api/room', async (req, res) => {
   const { title, content, questions, hostId } = req.body
   if (!title || !content || !Array.isArray(questions) || questions.length < 2 || !hostId) {
     return res.status(400).json({ error: '缺少必要欄位' })
   }
   let code = genCode()
-  while (rooms.has(code)) code = genCode()
-  rooms.set(code, { id: code, title, content, questions: questions.slice(0, 2), hostId, createdAt: Date.now() })
+  while (await roomExists(code)) code = genCode()
+  const room = { id: code, title, content, questions: questions.slice(0, 2), hostId, createdAt: Date.now() }
+  await setRoom(code, room)
   res.json({ roomCode: code })
 })
 
-app.get('/api/room/:code/answers', (req, res) => {
+app.get('/api/room/:code/answers', async (req, res) => {
   const code = req.params.code.toUpperCase()
-  const result = [...answers.values()].filter(a => a.roomCode === code)
+  const result = await getRoomAnswers(code)
   res.json(result)
 })
 
-app.post('/api/answer', (req, res) => {
+app.post('/api/answer', async (req, res) => {
   const { roomCode, userId, userName, questionIndex, answerText } = req.body
   if (!roomCode || !userId || !userName || questionIndex === undefined || !answerText) {
     return res.status(400).json({ error: '缺少必要欄位' })
   }
   const code = roomCode.toUpperCase()
-  if (!rooms.has(code)) return res.status(404).json({ error: '房間不存在' })
+  if (!(await roomExists(code))) return res.status(404).json({ error: '房間不存在' })
   const id = genId()
   const answer = { id, roomCode: code, userId, userName, questionIndex, answerText, isPublished: false, createdAt: Date.now() }
-  answers.set(id, answer)
+  await saveAnswer(answer)
   broadcast(code, { type: 'answer_update', answer })
   res.json(answer)
 })
 
-app.patch('/api/answer/:id/publish', (req, res) => {
-  const answer = answers.get(req.params.id)
+app.patch('/api/answer/:id/publish', async (req, res) => {
+  const answer = await getAnswer(req.params.id)
   if (!answer) return res.status(404).json({ error: '找不到回答' })
   answer.isPublished = req.body.isPublished ?? !answer.isPublished
+  await updateAnswer(answer)
   broadcast(answer.roomCode, { type: 'answer_update', answer })
   res.json(answer)
 })
