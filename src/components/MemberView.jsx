@@ -133,19 +133,27 @@ export default function MemberView({ userId, initialRoomCode, onBack }) {
   )
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 px-4 py-6">
-      <div className="max-w-2xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-xl font-bold text-white">{session.title}</h1>
-            <p className="text-slate-400 text-sm">你是：<span className="text-violet-300">{userName}</span></p>
+    <div className="min-h-screen bg-slate-900 text-slate-100">
+      <div className="bg-slate-800 border-b border-slate-700 px-4 py-4">
+        <div className="max-w-3xl mx-auto">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <p className="text-violet-400 text-xs font-mono tracking-widest mb-1">房間 {session.id}</p>
+              <h1 className="text-lg font-bold text-white leading-snug">{session.title}</h1>
+            </div>
+            <button onClick={onBack} className="text-slate-400 hover:text-white text-sm shrink-0 mt-1">← 離開</button>
           </div>
-          <button onClick={onBack} className="text-slate-400 hover:text-white text-sm">← 離開</button>
         </div>
-        <div className="bg-slate-800 rounded-xl p-5 mb-6">
-          <h2 className="text-slate-300 font-semibold mb-3 text-sm uppercase tracking-wide">共讀文章</h2>
-          <div className="text-slate-300 text-sm leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap">{session.content}</div>
+      </div>
+
+      <div className="max-w-3xl mx-auto px-4 py-6">
+        <div className="bg-slate-800 rounded-xl mb-6 overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-700">
+            <h2 className="text-slate-300 font-semibold text-sm tracking-wide">共讀文章</h2>
+          </div>
+          <div className="text-slate-200 text-base leading-relaxed max-h-72 overflow-y-auto whitespace-pre-wrap px-5 py-4">{session.content}</div>
         </div>
+
         <div className="mb-6">
           <div className="flex gap-2 mb-4">
             {session.questions.map((_, i) => (
@@ -168,18 +176,25 @@ export default function MemberView({ userId, initialRoomCode, onBack }) {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <textarea value={answers[i]}
-                    onChange={e => { const a = [...answers]; a[i] = e.target.value; setAnswers(a) }}
-                    disabled={submitting[i]} rows={5}
-                    placeholder="分享你的思考（20～500 字）..."
-                    className="w-full bg-slate-800 text-white placeholder-slate-500 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-y disabled:opacity-50" />
-                  <div className="flex items-center justify-between">
-                    <span className={`text-sm ${answers[i].length > 500 ? 'text-red-400' : 'text-slate-500'}`}>
-                      {answers[i].length} / 500 字
+                  <div className="relative">
+                    <textarea value={answers[i]}
+                      onChange={e => { const a = [...answers]; a[i] = e.target.value; setAnswers(a) }}
+                      disabled={submitting[i]} rows={6}
+                      placeholder="分享你的思考（20～500 字）..."
+                      className="w-full bg-slate-800 text-white placeholder-slate-500 rounded-lg px-4 py-3 pb-7 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-y disabled:opacity-50" />
+                    <span className={`absolute bottom-2 right-3 text-xs ${answers[i].length > 500 ? 'text-red-400' : 'text-slate-500'}`}>
+                      {answers[i].length} / 500
                     </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-slate-500 text-xs shrink-0">以</span>
+                      <span className="text-violet-300 text-sm font-medium truncate">{userName}</span>
+                      <span className="text-slate-500 text-xs shrink-0">的身份提交</span>
+                    </div>
                     <button onClick={() => submitAnswer(i)}
                       disabled={submitting[i] || answers[i].trim().length < 20}
-                      className="px-6 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors">
+                      className="px-6 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors shrink-0">
                       {submitting[i] ? '提交中...' : '提交回答'}
                     </button>
                   </div>
