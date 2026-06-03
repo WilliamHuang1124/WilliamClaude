@@ -1,17 +1,32 @@
 import React, { useState } from 'react'
 
+const ANONYMOUS_NAMES = [
+  '深思的哲學家', '縝密的分析者', '銳利的批評者', '洞見的觀察者',
+  '清醒的夢想家', '理性的詩人', '審慎的探索者', '敏銳的質疑者',
+]
+
+function getDefaultName() {
+  let n = sessionStorage.getItem('sympo_name')
+  if (!n) { n = ANONYMOUS_NAMES[Math.floor(Math.random() * ANONYMOUS_NAMES.length)]; sessionStorage.setItem('sympo_name', n) }
+  return n
+}
+
 export default function Landing({ onHost, onMember }) {
   const [code, setCode] = useState('')
+  const [name, setName] = useState(() => getDefaultName())
   const [err, setErr] = useState('')
 
   function handleJoin() {
-    const trimmed = code.trim().toUpperCase()
-    if (!/^[A-Z0-9]{6}$/.test(trimmed)) {
+    const trimmedName = name.trim()
+    if (!trimmedName) { setErr('請先輸入你的名稱'); return }
+    const trimmedCode = code.trim().toUpperCase()
+    if (!/^[A-Z0-9]{6}$/.test(trimmedCode)) {
       setErr('請輸入有效的 6 位房間碼（英文字母或數字）')
       return
     }
+    sessionStorage.setItem('sympo_name', trimmedName)
     setErr('')
-    onMember(trimmed)
+    onMember(trimmedCode)
   }
 
   return (
@@ -41,15 +56,30 @@ export default function Landing({ onHost, onMember }) {
 
         <div className="bg-slate-800 rounded-xl p-6 space-y-4">
           <h2 className="text-white font-semibold text-lg">加入共讀房間</h2>
-          <input
-            type="text"
-            maxLength={6}
-            value={code}
-            onChange={e => { setCode(e.target.value.toUpperCase()); setErr('') }}
-            onKeyDown={e => e.key === 'Enter' && handleJoin()}
-            placeholder="輸入 6 位房間碼"
-            className="w-full bg-slate-700 text-white placeholder-slate-500 rounded-lg px-4 py-3 text-center text-xl tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-violet-500"
-          />
+          <div className="space-y-1">
+            <label className="text-slate-400 text-sm">你的名稱</label>
+            <input
+              type="text"
+              maxLength={20}
+              value={name}
+              onChange={e => { setName(e.target.value); setErr('') }}
+              onKeyDown={e => e.key === 'Enter' && handleJoin()}
+              placeholder="輸入你的名稱，方便主持人辨識"
+              className="w-full bg-slate-700 text-white placeholder-slate-500 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-violet-500"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-slate-400 text-sm">房間碼</label>
+            <input
+              type="text"
+              maxLength={6}
+              value={code}
+              onChange={e => { setCode(e.target.value.toUpperCase()); setErr('') }}
+              onKeyDown={e => e.key === 'Enter' && handleJoin()}
+              placeholder="輸入 6 位房間碼"
+              className="w-full bg-slate-700 text-white placeholder-slate-500 rounded-lg px-4 py-3 text-center text-xl tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-violet-500"
+            />
+          </div>
           {err && <p className="text-red-400 text-sm">{err}</p>}
           <button
             onClick={handleJoin}
