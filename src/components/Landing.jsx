@@ -1,19 +1,8 @@
 import React, { useState } from 'react'
 
-const ANONYMOUS_NAMES = [
-  '深思的哲學家', '縝密的分析者', '銳利的批評者', '洞見的觀察者',
-  '清醒的夢想家', '理性的詩人', '審慎的探索者', '敏銳的質疑者',
-]
-
-function getDefaultName() {
-  let n = sessionStorage.getItem('sympo_name')
-  if (!n) { n = ANONYMOUS_NAMES[Math.floor(Math.random() * ANONYMOUS_NAMES.length)]; sessionStorage.setItem('sympo_name', n) }
-  return n
-}
-
 export default function Landing({ onHost, onMember }) {
   const [code, setCode] = useState('')
-  const [name, setName] = useState(() => getDefaultName())
+  const [name, setName] = useState('')
   const [err, setErr] = useState('')
 
   function handleJoin() {
@@ -64,7 +53,7 @@ export default function Landing({ onHost, onMember }) {
               value={name}
               onChange={e => { setName(e.target.value); setErr('') }}
               onKeyDown={e => e.key === 'Enter' && handleJoin()}
-              placeholder="輸入你的名稱，方便主持人辨識"
+              placeholder="在這裡輸入您的名字"
               className="w-full bg-slate-700 text-white placeholder-slate-500 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-violet-500"
             />
           </div>

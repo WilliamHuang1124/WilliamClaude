@@ -1,10 +1,4 @@
-import React, { useState, useEffect } from 'react'
-
-const ANONYMOUS_NAMES = [
-  '深思的哲學家', '縝密的分析者', '銳利的批評者', '洞見的觀察者',
-  '清醒的夢想家', '理性的詩人', '審慎的探索者', '敏銳的質疑者',
-  '沉靜的智者', '勇敢的論辯者', '細膩的讀者', '遠見的思考者',
-]
+import React, { useState, useEffect, useRef } from 'react'
 
 function copyRoomCode(code) {
   try {
@@ -32,6 +26,21 @@ export default function HostView({ userId, onBack }) {
   const [answers, setAnswers] = useState([])
   const [copied, setCopied] = useState(false)
   const [filterQ, setFilterQ] = useState(-1)
+  const contentRef = useRef(null)
+
+  function wrapSelection(before, after) {
+    const el = contentRef.current
+    if (!el) return
+    const start = el.selectionStart
+    const end = el.selectionEnd
+    const selected = content.slice(start, end)
+    const next = content.slice(0, start) + before + selected + after + content.slice(end)
+    setContent(next)
+    setTimeout(() => {
+      el.focus()
+      el.setSelectionRange(start + before.length, end + before.length)
+    }, 0)
+  }
 
   async function generateQuestions() {
     if (!content.trim()) { setGenError('請先輸入共讀文章或書摘'); return }
@@ -126,7 +135,20 @@ export default function HostView({ userId, onBack }) {
             </div>
             <div>
               <label className="block text-slate-300 mb-2 font-medium">共讀文章 / 書摘段落</label>
-              <textarea value={content} onChange={e => setContent(e.target.value)} rows={8}
+              <div className="flex gap-2 mb-2">
+                <button type="button" onMouseDown={e => { e.preventDefault(); wrapSelection('**', '**') }}
+                  title="粗體（選取文字後點擊）"
+                  className="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold rounded-lg transition-colors border border-slate-600">
+                  B
+                </button>
+                <button type="button" onMouseDown={e => { e.preventDefault(); wrapSelection('==', '==') }}
+                  title="螢光標記（選取文字後點擊）"
+                  className="px-3 py-1 bg-yellow-400/20 hover:bg-yellow-400/30 text-yellow-200 text-sm font-medium rounded-lg transition-colors border border-yellow-600/40">
+                  螢光
+                </button>
+                <span className="text-slate-600 text-xs self-center ml-1">選取文字後點擊套用</span>
+              </div>
+              <textarea ref={contentRef} value={content} onChange={e => setContent(e.target.value)} rows={8}
                 placeholder="貼上您的共讀文章或書摘（最多 3000 字用於問題生成）"
                 className="w-full bg-slate-800 text-white placeholder-slate-500 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-y" />
               <p className="text-slate-500 text-sm mt-1">{content.length} 字</p>
