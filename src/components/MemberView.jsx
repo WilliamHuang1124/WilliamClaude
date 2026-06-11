@@ -33,6 +33,7 @@ export default function MemberView({ userId, initialRoomCode, onBack }) {
   const [answers, setAnswers] = useState(['', ''])
   const [submitted, setSubmitted] = useState([false, false])
   const [submitting, setSubmitting] = useState([false, false])
+  const [qErrs, setQErrs] = useState(['', ''])
   const [publishedAnswers, setPublishedAnswers] = useState([])
 
   async function loadRoom(code) {
@@ -87,11 +88,15 @@ export default function MemberView({ userId, initialRoomCode, onBack }) {
     return () => ws.close()
   }, [session])
 
+  function setQErr(qIndex, message) {
+    setQErrs(prev => { const n = [...prev]; n[qIndex] = message; return n })
+  }
+
   async function submitAnswer(qIndex) {
     const text = answers[qIndex].trim()
-    if (text.length < 20) { setErr(`回答至少需要 20 字（目前 ${text.length} 字）`); return }
-    if (text.length > 500) { setErr('回答不得超過 500 字'); return }
-    setErr('')
+    if (text.length < 20) { setQErr(qIndex, `回答至少需要 20 字，目前僅 ${text.length} 字，請再補充你的想法`); return }
+    if (text.length > 500) { setQErr(qIndex, '回答不得超過 500 字'); return }
+    setQErr(qIndex, '')
     setSubmitting(s => { const n = [...s]; n[qIndex] = true; return n })
     try {
       const res = await fetch('/api/answer', {
@@ -102,7 +107,7 @@ export default function MemberView({ userId, initialRoomCode, onBack }) {
       if (!res.ok) throw new Error((await res.json()).error)
       setSubmitted(s => { const n = [...s]; n[qIndex] = true; return n })
     } catch (e) {
-      setErr(`提交失敗：${e.message}`)
+      setQErr(qIndex, `提交失敗：${e.message}`)
     } finally {
       setSubmitting(s => { const n = [...s]; n[qIndex] = false; return n })
     }
@@ -182,7 +187,7 @@ export default function MemberView({ userId, initialRoomCode, onBack }) {
                   <div className="p-4 space-y-3">
                     <div className="relative">
                       <textarea value={answers[i]}
-                        onChange={e => { const a = [...answers]; a[i] = e.target.value; setAnswers(a) }}
+                        onChange={e => { const a = [...answers]; a[i] = e.target.value; setAnswers(a); setQErr(i, '') }}
                         disabled={submitting[i]} rows={5}
                         placeholder="分享你的思考（20～500 字）..."
                         className="w-full bg-slate-700 text-white placeholder-slate-500 rounded-lg px-4 py-3 pb-7 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-y disabled:opacity-50" />
@@ -190,6 +195,9 @@ export default function MemberView({ userId, initialRoomCode, onBack }) {
                         {answers[i].length} / 500
                       </span>
                     </div>
+                    {qErrs[i] && (
+                      <p className="text-red-400 text-sm bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">⚠ {qErrs[i]}</p>
+                    )}
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1 min-w-0">
                         <span className="text-slate-500 text-xs shrink-0">以</span>
@@ -197,7 +205,7 @@ export default function MemberView({ userId, initialRoomCode, onBack }) {
                         <span className="text-slate-500 text-xs shrink-0">提交</span>
                       </div>
                       <button onClick={() => submitAnswer(i)}
-                        disabled={submitting[i] || answers[i].trim().length < 20}
+                        disabled={submitting[i]}
                         className="px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors shrink-0">
                         {submitting[i] ? '提交中...' : '提交回答'}
                       </button>

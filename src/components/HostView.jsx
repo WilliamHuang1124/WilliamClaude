@@ -27,7 +27,21 @@ export default function HostView({ userId, onBack }) {
   const [copied, setCopied] = useState(false)
   const [filterQ, setFilterQ] = useState(-1)
   const [members, setMembers] = useState([])
+  const [refreshingMembers, setRefreshingMembers] = useState(false)
+  const [generatedQuestions, setGeneratedQuestions] = useState([])
+  const [selectedIdx, setSelectedIdx] = useState([])
   const contentRef = useRef(null)
+
+  const sortedSelectedIdx = [...selectedIdx].sort((a, b) => a - b)
+  const selectedQuestions = sortedSelectedIdx.map(i => generatedQuestions[i]).filter(q => q && q.trim())
+
+  function toggleSelect(i) {
+    setSelectedIdx(prev => {
+      if (prev.includes(i)) return prev.filter(x => x !== i)
+      if (prev.length >= 2) return prev
+      return [...prev, i]
+    })
+  }
 
   function wrapSelection(before, after) {
     const el = contentRef.current
@@ -55,7 +69,8 @@ export default function HostView({ userId, onBack }) {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || `${res.status}`)
-      setQuestions(data.questions)
+      setGeneratedQuestions(data.questions)
+      setSelectedIdx([])
     } catch (e) {
       setGenError(`生成失敗：${e.message}`)
     } finally {
@@ -64,16 +79,17 @@ export default function HostView({ userId, onBack }) {
   }
 
   async function createRoom() {
-    if (!title.trim() || !content.trim() || questions.length < 2) return
+    if (!title.trim() || !content.trim() || selectedQuestions.length !== 2) return
     setCreating(true)
     try {
       const res = await fetch('/api/room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content, questions, hostId: userId }),
+        body: JSON.stringify({ title, content, questions: selectedQuestions, hostId: userId }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
+      setQuestions(selectedQuestions)
       setRoomCode(data.roomCode)
       setStep('room')
     } catch (e) {
@@ -83,11 +99,23 @@ export default function HostView({ userId, onBack }) {
     }
   }
 
+  async function loadMembers() {
+    if (!roomCode) return
+    setRefreshingMembers(true)
+    try {
+      const res = await fetch(`/api/room/${roomCode}/members`)
+      if (res.ok) setMembers(await res.json())
+    } catch {} finally {
+      setRefreshingMembers(false)
+    }
+  }
+
   useEffect(() => {
     if (step !== 'room' || !roomCode) return
     fetch(`/api/room/${roomCode}/answers`)
       .then(r => r.json())
       .then(data => setAnswers(data.sort((a, b) => b.createdAt - a.createdAt)))
+    loadMembers()
 
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
     const ws = new WebSocket(`${protocol}://${location.host}/ws`)
@@ -163,25 +191,37 @@ export default function HostView({ userId, onBack }) {
             {genError && <p className="text-red-400 text-sm">{genError}</p>}
             <button onClick={generateQuestions} disabled={generating}
               className="w-full py-3 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors">
-              {generating ? '生成中...' : '✦ 生成思辨問題'}
+              {generating ? '生成中...' : generatedQuestions.length > 0 ? '↻ 重新生成 5 題' : '✦ 生成思辨問題（5 題）'}
             </button>
-            {questions.length === 2 && (
-              <div className="bg-slate-800 rounded-xl p-5 space-y-4 border border-violet-800">
+            {generatedQuestions.length > 0 && (
+              <div className="bg-slate-800 rounded-xl p-5 space-y-3 border border-violet-800">
                 <h2 className="text-violet-300 font-semibold">✦ AI 生成的思辨問題</h2>
-                {questions.map((q, i) => (
-                  <div key={i} className="bg-slate-700 rounded-lg p-4">
-                    <span className="text-violet-400 font-bold mr-2">Q{i + 1}.</span>
-                    <input type="text" value={q}
-                      onChange={e => { const qs = [...questions]; qs[i] = e.target.value; setQuestions(qs) }}
-                      className="bg-transparent text-white w-full focus:outline-none" />
-                  </div>
-                ))}
+                <p className="text-slate-400 text-sm">
+                  點選 2 題作為本場問答題目（已選 <span className={selectedIdx.length === 2 ? 'text-teal-300 font-bold' : 'text-violet-300 font-bold'}>{selectedIdx.length}</span> / 2），文字可直接修改
+                </p>
+                {generatedQuestions.map((q, i) => {
+                  const selected = selectedIdx.includes(i)
+                  return (
+                    <div key={i} onClick={() => toggleSelect(i)}
+                      className={`rounded-lg p-4 cursor-pointer transition-colors border ${selected ? 'bg-violet-900/40 border-violet-500' : 'bg-slate-700 border-transparent hover:border-slate-500'}`}>
+                      <div className="flex items-center gap-3">
+                        <span className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${selected ? 'bg-violet-500 text-white' : 'bg-slate-600 text-slate-400'}`}>
+                          {selected ? `Q${sortedSelectedIdx.indexOf(i) + 1}` : i + 1}
+                        </span>
+                        <input type="text" value={q}
+                          onClick={e => e.stopPropagation()}
+                          onChange={e => { const qs = [...generatedQuestions]; qs[i] = e.target.value; setGeneratedQuestions(qs) }}
+                          className="bg-transparent text-white w-full focus:outline-none" />
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )}
             <button onClick={createRoom}
-              disabled={creating || !title.trim() || !content.trim() || questions.length < 2}
+              disabled={creating || !title.trim() || !content.trim() || selectedQuestions.length !== 2}
               className="w-full py-4 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-lg transition-colors">
-              {creating ? '建立中...' : '建立共讀房間 →'}
+              {creating ? '建立中...' : generatedQuestions.length > 0 && selectedQuestions.length !== 2 ? '請先選擇 2 題思辨問題' : '建立共讀房間 →'}
             </button>
           </div>
         </div>
@@ -210,24 +250,6 @@ export default function HostView({ userId, onBack }) {
               {copied ? '已複製 ✓' : '複製房間碼'}
             </button>
           </div>
-        </div>
-        <div className="bg-slate-800 rounded-xl p-5 mb-6">
-          <div className="flex items-center gap-2 mb-3">
-            <span className={`w-2 h-2 rounded-full ${members.length > 0 ? 'bg-teal-400 animate-pulse' : 'bg-slate-600'}`} />
-            <h2 className="text-slate-300 font-semibold text-sm">已加入成員</h2>
-            <span className="text-slate-500 text-xs">（{members.length} 人）</span>
-          </div>
-          {members.length === 0 ? (
-            <p className="text-slate-600 text-sm">等待成員加入...</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {members.map(m => (
-                <span key={m.userId} className="px-3 py-1 bg-slate-700 text-slate-200 text-sm rounded-full">
-                  {m.userName}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
         <div className="bg-slate-800 rounded-xl p-5 mb-8">
           <h2 className="text-slate-300 font-semibold mb-3">思辨問題</h2>
@@ -271,6 +293,28 @@ export default function HostView({ userId, onBack }) {
                     </button>
                   </div>
                 </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="bg-slate-800 rounded-xl p-5 mt-8">
+          <div className="flex items-center gap-2 mb-3">
+            <span className={`w-2 h-2 rounded-full ${members.length > 0 ? 'bg-teal-400 animate-pulse' : 'bg-slate-600'}`} />
+            <h2 className="text-slate-300 font-semibold text-sm">已加入成員</h2>
+            <span className="text-slate-500 text-xs">（{members.length} 人）</span>
+            <button onClick={loadMembers} disabled={refreshingMembers}
+              className="ml-auto px-3 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-200 text-xs font-medium rounded-lg transition-colors">
+              {refreshingMembers ? '更新中...' : '↻ 更新名單'}
+            </button>
+          </div>
+          {members.length === 0 ? (
+            <p className="text-slate-600 text-sm">等待成員加入...</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {members.map(m => (
+                <span key={m.userId} className="px-3 py-1 bg-slate-700 text-slate-200 text-sm rounded-full">
+                  {m.userName}
+                </span>
               ))}
             </div>
           )}

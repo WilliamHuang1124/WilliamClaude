@@ -20,6 +20,7 @@ const redis = (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_R
 
 const memRooms = new Map()
 const memAnswers = new Map()
+const memMembers = new Map()
 
 const ROOM_TTL = 60 * 60 * 24 * 3
 
@@ -68,6 +69,25 @@ async function getRoomAnswers(code) {
   return [...memAnswers.values()].filter(a => a.roomCode === code)
 }
 
+async function addMember(code, member) {
+  if (redis) {
+    await redis.hset(`members:${code}`, { [member.userId]: member })
+    await redis.expire(`members:${code}`, ROOM_TTL)
+  } else {
+    if (!memMembers.has(code)) memMembers.set(code, new Map())
+    memMembers.get(code).set(member.userId, member)
+  }
+}
+
+async function getMembers(code) {
+  if (redis) {
+    const obj = await redis.hgetall(`members:${code}`)
+    return obj ? Object.values(obj) : []
+  }
+  const m = memMembers.get(code)
+  return m ? [...m.values()] : []
+}
+
 const roomSubscriptions = new Map()
 
 function genCode() {
@@ -99,6 +119,7 @@ wss.on('connection', (ws) => {
       }
       if (msg.type === 'join' && msg.roomCode && msg.userName && msg.userId) {
         const code = msg.roomCode.toUpperCase()
+        addMember(code, { userId: msg.userId, userName: msg.userName, joinedAt: Date.now() }).catch(() => {})
         broadcast(code, { type: 'member_join', userId: msg.userId, userName: msg.userName })
       }
     } catch {}
@@ -137,6 +158,12 @@ app.get('/api/room/:code/answers', async (req, res) => {
   res.json(result)
 })
 
+app.get('/api/room/:code/members', async (req, res) => {
+  const code = req.params.code.toUpperCase()
+  const members = await getMembers(code)
+  res.json(members.sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0)))
+})
+
 app.post('/api/answer', async (req, res) => {
   const { roomCode, userId, userName, questionIndex, answerText } = req.body
   if (!roomCode || !userId || !userName || questionIndex === undefined || !answerText) {
@@ -166,12 +193,13 @@ app.post('/api/generate', async (req, res) => {
   const key = process.env.GROQ_API_KEY
   if (!key) return res.status(500).json({ error: '伺服器未設定 GROQ_API_KEY' })
 
-  const prompt = `你是一位優秀的讀書會引導師。請根據以下文章內容，設計 2 道能激發深度討論的開放性思辨問題。
+  const prompt = `你是一位優秀的讀書會引導師。請根據以下文章內容，設計 5 道能激發深度討論的開放性思辨問題。
 要求：
 1. 問題應能引導讀者反思、辯論或從不同角度思考
 2. 避免是非題，鼓勵多元觀點
-3. 以繁體中文回答
-4. 只回傳 JSON 物件，格式為：{"questions": ["問題1", "問題2"]}
+3. 問題之間應涵蓋不同面向（如：個人反思、社會影響、價值判斷、實際應用等）
+4. 以繁體中文回答
+5. 只回傳 JSON 物件，格式為：{"questions": ["問題1", "問題2", "問題3", "問題4", "問題5"]}
 
 文章內容：
 ${content.slice(0, 3000)}`
@@ -200,7 +228,7 @@ ${content.slice(0, 3000)}`
     const parsed = JSON.parse(text)
     const questions = Array.isArray(parsed) ? parsed : parsed.questions
     if (!Array.isArray(questions) || questions.length < 2) throw new Error('格式異常')
-    res.json({ questions: questions.slice(0, 2) })
+    res.json({ questions: questions.slice(0, 5) })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
