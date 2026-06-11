@@ -14,7 +14,6 @@ const wss = new WebSocketServer({ server, path: '/ws' })
 app.use(cors())
 app.use(express.json())
 
-// Redis 連線（設定環境變數後自動啟用，否則退回記憶體模式）
 const redis = (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
   ? new Redis({ url: process.env.UPSTASH_REDIS_REST_URL, token: process.env.UPSTASH_REDIS_REST_TOKEN })
   : null
@@ -22,7 +21,7 @@ const redis = (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_R
 const memRooms = new Map()
 const memAnswers = new Map()
 
-const ROOM_TTL = 60 * 60 * 24 * 3 // 3 天自動過期
+const ROOM_TTL = 60 * 60 * 24 * 3
 
 async function getRoom(code) {
   if (redis) return redis.get(`room:${code}`)
@@ -69,7 +68,7 @@ async function getRoomAnswers(code) {
   return [...memAnswers.values()].filter(a => a.roomCode === code)
 }
 
-const roomSubscriptions = new Map() // roomCode -> Set<ws>
+const roomSubscriptions = new Map()
 
 function genCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -97,6 +96,10 @@ wss.on('connection', (ws) => {
         subscribedRoom = msg.roomCode.toUpperCase()
         if (!roomSubscriptions.has(subscribedRoom)) roomSubscriptions.set(subscribedRoom, new Set())
         roomSubscriptions.get(subscribedRoom).add(ws)
+      }
+      if (msg.type === 'join' && msg.roomCode && msg.userName && msg.userId) {
+        const code = msg.roomCode.toUpperCase()
+        broadcast(code, { type: 'member_join', userId: msg.userId, userName: msg.userName })
       }
     } catch {}
   })

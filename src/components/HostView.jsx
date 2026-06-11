@@ -26,6 +26,7 @@ export default function HostView({ userId, onBack }) {
   const [answers, setAnswers] = useState([])
   const [copied, setCopied] = useState(false)
   const [filterQ, setFilterQ] = useState(-1)
+  const [members, setMembers] = useState([])
   const contentRef = useRef(null)
 
   function wrapSelection(before, after) {
@@ -98,6 +99,12 @@ export default function HostView({ userId, onBack }) {
           const idx = prev.findIndex(a => a.id === msg.answer.id)
           if (idx >= 0) { const next = [...prev]; next[idx] = msg.answer; return next }
           return [msg.answer, ...prev]
+        })
+      }
+      if (msg.type === 'member_join') {
+        setMembers(prev => {
+          if (prev.find(m => m.userId === msg.userId)) return prev
+          return [...prev, { userId: msg.userId, userName: msg.userName, joinedAt: Date.now() }]
         })
       }
     }
@@ -192,7 +199,7 @@ export default function HostView({ userId, onBack }) {
           </div>
           <button onClick={onBack} className="text-slate-400 hover:text-white text-sm">← 返回首頁</button>
         </div>
-        <div className="bg-slate-800 rounded-xl p-5 mb-8 border border-teal-800">
+        <div className="bg-slate-800 rounded-xl p-5 mb-6 border border-teal-800">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-slate-400 text-sm mb-1">房間碼</p>
@@ -203,6 +210,24 @@ export default function HostView({ userId, onBack }) {
               {copied ? '已複製 ✓' : '複製房間碼'}
             </button>
           </div>
+        </div>
+        <div className="bg-slate-800 rounded-xl p-5 mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <span className={`w-2 h-2 rounded-full ${members.length > 0 ? 'bg-teal-400 animate-pulse' : 'bg-slate-600'}`} />
+            <h2 className="text-slate-300 font-semibold text-sm">已加入成員</h2>
+            <span className="text-slate-500 text-xs">（{members.length} 人）</span>
+          </div>
+          {members.length === 0 ? (
+            <p className="text-slate-600 text-sm">等待成員加入...</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {members.map(m => (
+                <span key={m.userId} className="px-3 py-1 bg-slate-700 text-slate-200 text-sm rounded-full">
+                  {m.userName}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="bg-slate-800 rounded-xl p-5 mb-8">
           <h2 className="text-slate-300 font-semibold mb-3">思辨問題</h2>

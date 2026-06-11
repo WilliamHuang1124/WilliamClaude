@@ -14,7 +14,7 @@ function renderContent(text) {
   if (last < text.length) parts.push({ type: 'text', value: text.slice(last) })
 
   return parts.map((p, i) => {
-    if (p.type === 'bold') return <strong key={i} className="font-bold text-white">{p.value}</strong>
+    if (p.type === 'bold') return <strong key={i} className="font-bold text-white text-xl leading-snug">{p.value}</strong>
     if (p.type === 'highlight') return (
       <mark key={i} style={{ backgroundColor: '#fef08a', color: '#1e293b' }} className="px-0.5 rounded">{p.value}</mark>
     )
@@ -70,7 +70,10 @@ export default function MemberView({ userId, initialRoomCode, onBack }) {
 
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
     const ws = new WebSocket(`${protocol}://${location.host}/ws`)
-    ws.onopen = () => ws.send(JSON.stringify({ type: 'subscribe', roomCode: session.id }))
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: 'subscribe', roomCode: session.id }))
+      ws.send(JSON.stringify({ type: 'join', roomCode: session.id, userId, userName }))
+    }
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data)
       if (msg.type === 'answer_update' && msg.answer.roomCode === session.id) {
