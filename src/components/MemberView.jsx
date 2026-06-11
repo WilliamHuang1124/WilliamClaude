@@ -29,7 +29,7 @@ export default function MemberView({ userId, initialRoomCode, onBack }) {
   const [err, setErr] = useState('')
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(!!initialRoomCode)
-  const [userName, setUserName] = useState('')
+  const [userName, setUserName] = useState(() => sessionStorage.getItem('sympo_name') || '')
   const [answers, setAnswers] = useState(['', ''])
   const [submitted, setSubmitted] = useState([false, false])
   const [submitting, setSubmitting] = useState([false, false])
