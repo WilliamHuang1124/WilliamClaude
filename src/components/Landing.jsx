@@ -23,6 +23,7 @@ export default function Landing({ onHost, onMember }) {
       <div className="mb-10 text-center">
         <h1 className="text-4xl font-bold text-white mb-2 tracking-wide">思辨共讀</h1>
         <p className="text-slate-400 text-lg">SympoRead — 深度閱讀，共同思辨</p>
+        <p className="text-slate-600 text-sm mt-2">Made by William</p>
       </div>
 
       <div className="w-full max-w-md space-y-6">
